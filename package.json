@@ -119,10 +119,13 @@
     "hapi": "14.2.0",
     "cryptiles": "^4.1.2",
     "hapi-cors-headers": "^1.0.3",
+    "istanbul-lib-coverage": "^2.0.1",
     "js-string-escape": "^1.0.1",
     "jsonpath-plus": "^0.16.0",
     "jsonwebtoken": "^8.3.0",
     "lodash": "^4.17.10",
+    "p-debounce": "^1.0.0",
+    "p-queue": "^3.0.0",
     "uuid": "^3.3.2",
     "velocityjs": "^1.1.2"
   },

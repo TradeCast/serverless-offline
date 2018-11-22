@@ -11,6 +11,12 @@ const corsHeaders = require('hapi-cors-headers');
 const _ = require('lodash');
 const crypto = require('crypto');
 
+// Coverage dependencies
+const util = require('util');
+const pQueue = require('p-queue');
+const pDebounce = require('p-debounce');
+const libCoverage = require('istanbul-lib-coverage');
+
 // Internal lib
 const debugLog = require('./debugLog');
 const jsonPath = require('./jsonPath');
@@ -24,6 +30,7 @@ const Endpoint = require('./Endpoint');
 const parseResources = require('./parseResources');
 const utils = require('./utils');
 
+const writeFile = util.promisify(fs.writeFile);
 const isNestedString = RegExp.prototype.test.bind(/^'.*?'$/);
 
 /*
@@ -39,6 +46,55 @@ class Offline {
     this.exitCode = 0;
     this.provider = 'aws';
     this.start = this.start.bind(this);
+    this.coverageDataOutputPath = process.env.SLS_OFFLINE_COVERAGE_DATA_OUTPUT_PATH;
+    this.shouldOutputCoverage = typeof this.coverageDataOutputPath !== 'undefined';
+
+    if (this.shouldOutputCoverage) {
+      debugLog(
+        `Code coverage will be written to ${this.coverageDataOutputPath}`
+      );
+      /* eslint-disable new-cap */
+      this.coverageQueue = new pQueue({ concurrency: 1 });
+      /* eslint-enable new-cap */
+      this.outputCoverage = pDebounce(
+        coverageData =>
+          this.coverageQueue.add(async () => {
+            debugLog('_____ COVERAGE _____');
+
+            if (coverageData == null) {
+              console.warn('[offline] warning: was instructed to output coverage data, but no coverage data could be found after executing the lambda function handler. Most likely the handler code is not instrumented.');
+
+              return;
+            }
+
+            await writeFile(
+              this.coverageDataOutputPath,
+              JSON.stringify(coverageData),
+              'utf8',
+            );
+
+            console.log(
+              `Coverage data written to ${this.coverageDataOutputPath}`
+            );
+
+            if (typeof process.env.SLS_DEBUG !== 'undefined') {
+              const coverageMap = libCoverage.createCoverageMap(coverageData);
+              const summary = coverageMap
+                .files()
+                .reduce(
+                  (sum, f) => sum.merge(coverageMap.fileCoverageFor(f).toSummary()),
+                  libCoverage.createCoverageSummary(),
+                );
+              debugLog('Global coverage summary', summary);
+            }
+          }),
+        // TODO: perhaps make this configurable
+        500,
+      );
+    }
+    else {
+      debugLog('Code coverage processing disabled');
+    }
 
     this.commands = {
       offline: {
@@ -635,6 +691,13 @@ class Offline {
 
               // Timeout clearing if needed
               if (this._clearTimeout(requestId)) return;
+
+              if (this.shouldOutputCoverage) {
+                this.outputCoverage(global.__coverage__).catch(error => {
+                  console.error('Error outputting code coverage:', error)
+                });
+                debugLog('(triggered debounced coverage output handler)');
+              }
 
               // User should not call context.done twice
               if (this.requests[requestId].done) {
