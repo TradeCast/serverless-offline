@@ -30,6 +30,7 @@ const Endpoint = require('./Endpoint');
 const parseResources = require('./parseResources');
 const utils = require('./utils');
 
+const COVERAGE_OUTPUT_DEBOUNCE_DURATION = 500;
 const writeFile = util.promisify(fs.writeFile);
 const isNestedString = RegExp.prototype.test.bind(/^'.*?'$/);
 
@@ -88,8 +89,7 @@ class Offline {
               debugLog('Global coverage summary', summary);
             }
           }),
-        // TODO: perhaps make this configurable
-        500,
+        COVERAGE_OUTPUT_DEBOUNCE_DURATION,
       );
     }
     else {
