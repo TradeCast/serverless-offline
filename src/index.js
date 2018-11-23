@@ -693,9 +693,9 @@ class Offline {
               if (this._clearTimeout(requestId)) return;
 
               if (this.shouldOutputCoverage) {
-                this.outputCoverage(global.__coverage__).catch(error => {
-                  console.error('Error outputting code coverage:', error)
-                });
+                this.outputCoverage(global.__coverage__).catch(error =>
+                  console.error('Error outputting code coverage:', error),
+                );
                 debugLog('(triggered debounced coverage output handler)');
               }
 
