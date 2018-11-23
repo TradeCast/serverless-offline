@@ -54,9 +54,7 @@ class Offline {
       debugLog(
         `Code coverage will be written to ${this.coverageDataOutputPath}`
       );
-      /* eslint-disable new-cap */
-      this.coverageQueue = new pQueue({ concurrency: 1 });
-      /* eslint-enable new-cap */
+      this.coverageQueue = new pQueue({ concurrency: 1 }); // eslint-disable-line new-cap
       this.outputCoverage = pDebounce(
         coverageData =>
           this.coverageQueue.add(async () => {
