@@ -12,7 +12,8 @@ const crypto = require('crypto');
 const util = require('util');
 const pQueue = require('p-queue');
 const pDebounce = require('p-debounce');
-const libCoverage = require('istanbul-lib-coverage');
+const makeDir = require('make-dir');
+const uuid = require('uuid/v4');
 
 // Internal lib
 const debugLog = require('./debugLog');
@@ -29,9 +30,9 @@ const utils = require('./utils');
 const authFunctionNameExtractor = require('./authFunctionNameExtractor');
 const requestBodyValidator = require('./requestBodyValidator');
 
+// Coverage variables
 const COVERAGE_OUTPUT_DEBOUNCE_DURATION = 500;
 const writeFile = util.promisify(fs.writeFile);
-const isNestedString = RegExp.prototype.test.bind(/^'.*?'$/);
 
 /*
   I'm against monolithic code like this file
@@ -45,12 +46,12 @@ class Offline {
     this.serverlessLog = serverless.cli.log.bind(serverless.cli);
     this.options = options;
     this.exitCode = 0;
-    this.coverageDataOutputPath = process.env.SLS_OFFLINE_COVERAGE_DATA_OUTPUT_PATH;
-    this.shouldOutputCoverage = typeof this.coverageDataOutputPath !== 'undefined';
+    this.coverageTempDir = process.env.SLS_OFFLINE_COVERAGE_TEMP_DIR;
+    this.shouldOutputCoverage = typeof this.coverageTempDir !== 'undefined';
 
     if (this.shouldOutputCoverage) {
       debugLog(
-        `Code coverage will be written to ${this.coverageDataOutputPath}`
+        `Code coverage will be written to ${this.coverageTempDir}`
       );
       this.coverageQueue = new pQueue({ concurrency: 1 }); // eslint-disable-line new-cap
       this.outputCoverage = pDebounce(
@@ -64,26 +65,19 @@ class Offline {
               return;
             }
 
+            await makeDir(this.coverageTempDir);
             await writeFile(
-              this.coverageDataOutputPath,
+              path.join(
+                this.coverageTempDir,
+                `${uuid().replace(/-/g, '')}.json`
+              ),
               JSON.stringify(coverageData),
               'utf8',
             );
 
             console.log(
-              `Coverage data written to ${this.coverageDataOutputPath}`
+              `Coverage data written to ${this.coverageTempDir}`
             );
-
-            if (typeof process.env.SLS_DEBUG !== 'undefined') {
-              const coverageMap = libCoverage.createCoverageMap(coverageData);
-              const summary = coverageMap
-                .files()
-                .reduce(
-                  (sum, f) => sum.merge(coverageMap.fileCoverageFor(f).toSummary()),
-                  libCoverage.createCoverageSummary(),
-                );
-              debugLog('Global coverage summary', summary);
-            }
           }),
         COVERAGE_OUTPUT_DEBOUNCE_DURATION,
       );
