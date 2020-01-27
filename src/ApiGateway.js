@@ -8,7 +8,7 @@ const h2o2 = require('@hapi/h2o2');
 
 // Coverage dependencies
 const util = require('util');
-const pQueue = require('p-queue');
+const {default: PQueue} = require('p-queue');
 const pDebounce = require('p-debounce');
 const makeDir = require('make-dir');
 const uuid = require('uuid/v4');
@@ -42,7 +42,7 @@ module.exports = class ApiGateway {
 
     if (this.shouldOutputCoverage) {
       debugLog(`Code coverage will be written to ${this.coverageTempDir}`);
-      this.coverageQueue = new pQueue({ concurrency: 1 }); // eslint-disable-line new-cap
+      this.coverageQueue = new PQueue({ concurrency: 1 }); // eslint-disable-line new-cap
       this.outputCoverage = pDebounce(
         (coverageData) =>
           this.coverageQueue.add(async () => {
