@@ -5,6 +5,14 @@ const path = require('path');
 const { performance, PerformanceObserver } = require('perf_hooks');
 const hapi = require('@hapi/hapi');
 const h2o2 = require('@hapi/h2o2');
+
+// Coverage dependencies
+const util = require('util');
+const pQueue = require('p-queue');
+const pDebounce = require('p-debounce');
+const makeDir = require('make-dir');
+const uuid = require('uuid/v4');
+
 const debugLog = require('./debugLog');
 const jsonPath = require('./jsonPath');
 const LambdaContext = require('./LambdaContext.js');
@@ -18,6 +26,10 @@ const parseResources = require('./parseResources');
 const { detectEncoding, createUniqueId } = require('./utils');
 const authFunctionNameExtractor = require('./authFunctionNameExtractor');
 
+// Coverage variables
+const COVERAGE_OUTPUT_DEBOUNCE_DURATION = 500;
+const writeFile = util.promisify(fs.writeFile);
+
 module.exports = class ApiGateway {
   constructor(serverless, options, velocityContextOptions) {
     this.serverless = serverless;
@@ -25,6 +37,42 @@ module.exports = class ApiGateway {
     this.serverlessLog = serverless.cli.log.bind(serverless.cli);
     this.options = options;
     this.exitCode = 0;
+    this.coverageTempDir = process.env.SLS_OFFLINE_COVERAGE_TEMP_DIR;
+    this.shouldOutputCoverage = typeof this.coverageTempDir !== 'undefined';
+
+    if (this.shouldOutputCoverage) {
+      debugLog(`Code coverage will be written to ${this.coverageTempDir}`);
+      this.coverageQueue = new pQueue({ concurrency: 1 }); // eslint-disable-line new-cap
+      this.outputCoverage = pDebounce(
+        (coverageData) =>
+          this.coverageQueue.add(async () => {
+            debugLog('_____ COVERAGE _____');
+
+            if (coverageData == null) {
+              console.warn(
+                '[offline] warning: was instructed to output coverage data, but no coverage data could be found after executing the lambda function handler. Most likely the handler code is not instrumented.',
+              );
+
+              return;
+            }
+
+            await makeDir(this.coverageTempDir);
+            await writeFile(
+              path.join(
+                this.coverageTempDir,
+                `${uuid().replace(/-/g, '')}.json`,
+              ),
+              JSON.stringify(coverageData),
+              'utf8',
+            );
+
+            console.log(`Coverage data written to ${this.coverageTempDir}`);
+          }),
+        COVERAGE_OUTPUT_DEBOUNCE_DURATION,
+      );
+    } else {
+      debugLog('Code coverage processing disabled');
+    }
 
     this.requests = {};
     this.lastRequestOptions = null;
@@ -545,6 +593,13 @@ module.exports = class ApiGateway {
             (err, data, fromPromise) => {
               // Everything in this block happens once the lambda function has resolved
               debugLog('_____ HANDLER RESOLVED _____');
+
+              if (this.shouldOutputCoverage) {
+                this.outputCoverage(global.__coverage__).catch(error =>
+                  console.error('Error outputting code coverage:', error),
+                );
+                debugLog('(triggered debounced coverage output handler)');
+              }
 
               // User should not call context.done twice
               if (!this.requests[requestId] || this.requests[requestId].done) {

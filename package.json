@@ -1,5 +1,9 @@
 {
-  "name": "serverless-offline",
+  "name": "@tradecast/serverless-offline",
+  "publishConfig": {
+    "always-auth": true,
+    "registry": "https://npm.tradecast.eu:4879"
+  },
   "version": "5.12.1",
   "description": "Emulate AWS λ and API Gateway locally when developing your Serverless project",
   "license": "MIT",
@@ -147,10 +151,14 @@
     "jsonpath-plus": "^1.1.0",
     "jsonwebtoken": "^8.5.1",
     "luxon": "^1.21.3",
+    "make-dir": "^3.0.0",
     "object.fromentries": "^2.0.1",
+    "p-debounce": "^2.1.0",
+    "p-queue": "^6.2.1",
     "semver": "^6.2.0",
     "trim-newlines": "^3.0.0",
     "update-notifier": "^3.0.1",
+    "uuid": "^3.4.0",
     "velocityjs": "^1.1.5"
   },
   "devDependencies": {
